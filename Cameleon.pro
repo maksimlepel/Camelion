@@ -4,6 +4,8 @@
 #
 #-------------------------------------------------
 
+#Some Note
+
 QT       += core gui network xml testlib\
        multimedia multimediawidgets
 
