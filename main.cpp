@@ -28,4 +28,5 @@ int main(int argc, char *argv[])
    // w.show();
 
     return a.exec();
-}
+}//some changes in maksimsBranch
+//second changes in maksimsBranch
