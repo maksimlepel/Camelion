@@ -1,0 +1,35 @@
+<RCC>
+    <qresource prefix="/Resources">
+        <file alias="arm">Images/arm.png</file>
+        <file alias="audio">Images/audio.png</file>
+        <file alias="battery">Images/battery.png</file>
+        <file alias="camera">Images/camera.png</file>
+        <file alias="invers">Images/invers.png</file>
+        <file alias="inverse">Images/inverse.png</file>
+        <file alias="light">Images/light.png</file>
+        <file alias="light_ir">Images/light_ir.png</file>
+        <file alias="light_level_0">Images/light_level_0.png</file>
+        <file alias="light_level_1">Images/light_level_1.png</file>
+        <file alias="light_level_1_ir">Images/light_level_1_ir.png</file>
+        <file alias="light_level_2">Images/light_level_2.png</file>
+        <file alias="light_level_2_ir">Images/light_level_2_ir.png</file>
+        <file alias="light_level_3">Images/light_level_3.png</file>
+        <file alias="light_level_3_ir">Images/light_level_3_ir.png</file>
+        <file alias="light_level_4">Images/light_level_4.png</file>
+        <file alias="light_level_4_ir">Images/light_level_4_ir.png</file>
+        <file alias="microphone">Images/microphone.png</file>
+        <file alias="phones">Images/phones.png</file>
+        <file alias="pic">Images/pic.jpg</file>
+        <file alias="radiomodem">Images/radiomodem.png</file>
+        <file alias="remote">Images/remote.png</file>
+        <file alias="shot">Images/shot.png</file>
+        <file alias="signal_level_0">Images/signal_level_0.png</file>
+        <file alias="signal_level_1">Images/signal_level_1.png</file>
+        <file alias="signal_level_2">Images/signal_level_2.png</file>
+        <file alias="signal_level_3">Images/signal_level_3.png</file>
+        <file alias="signal_level_4">Images/signal_level_4.png</file>
+        <file alias="signal_level_5">Images/signal_level_5.png</file>
+        <file alias="video">Images/video.png</file>
+        <file alias="photo">Images/photo.png</file>
+    </qresource>
+</RCC>

@@ -1,0 +1,898 @@
+#include "mainwindow.h"
+#include "ui_mainwindow.h"
+#include "QTextCodec"
+#include <QPixmap>
+#include <QApplication>
+#include <QDesktopWidget>
+#include "Dialogs/dgAudio.h"
+#include "Dialogs/dgLight.h"
+#include "Dialogs/dgArm.h"
+#include "Utils/FuncUtils.h"
+#include <windows.h>
+#include <QFileDialog>
+#include <QInputDialog>
+#include <QTest>
+#include <QFont>
+#include <QMessageBox>
+#include <QStringList>
+#include <libvlc-qt/include/VLCQtCore/Common.h>
+#include <libvlc-qt/include/VLCQtCore/Instance.h>
+#include <libvlc-qt/include/VLCQtCore/Media.h>
+#include <libvlc-qt/include/VLCQtCore/MediaPlayer.h>
+#include <Dialogs/dgCameraMode.h>
+
+
+MainWindow::MainWindow(QWidget *parent) :
+    QMainWindow(parent),
+    ui(new Ui::MainWindow),
+    joystick(0)
+{
+
+    ogreView = new OgreView(this);
+    startMedia=false;
+
+    ui->setupUi(this);
+    ui->horizontalLayout_2->insertWidget(2, ogreView, 1);
+    ui->btConnection->setVisible(false);
+
+    Qt::WindowFlags wf = windowFlags();
+    wf = Qt::FramelessWindowHint|Qt::WindowStaysOnTopHint;
+    setWindowFlags(wf);
+
+    isMaximizedStayOnTop = true;
+    isVideoConnected = false;
+    isSendConnected = false;
+    isReceiveConnected = false;
+    isStop = false;
+    isTwoJoystick=false;
+
+    setVisibleRArmButtons(false);
+
+    QFont font1;
+    font1.setWeight(99); // Жирный шрифт
+    ui->lbRecordFile->setStyleSheet("QLabel { color :"+ConstInfo::RECORD_COLOR+" }");
+    ui->lbRecordFile->setFont(font1);
+    ui->lbRecordFile->setText(" ");
+    //btNameRecord="Видеозапись";
+
+    ui->label_listen->setVisible(false);
+    ui->label_talk->setVisible(false);
+    ui->label_invers->setVisible(false);
+
+    qRegisterMetaType<ConstInfo::TypeMessage>( "ConstInfo::TypeMessage" );
+
+    QTextCodec::setCodecForLocale(QTextCodec::codecForName("Windows-1251"));
+    joystick = new VJoystickAdapter(this);
+
+
+    contrState = new ControllerState();
+    robotState = new RobotState();
+    showMessage = new ShowMessage(ui->infoLabel);
+
+    //создаем и запускаем поток на чтение сообщений от робота
+    cntrlMsgRcvThread = new ControllerMsgRcvThread(ConstInfo::PORT_RECEIVE_MSG, robotState, this);
+    connect(cntrlMsgRcvThread, SIGNAL(changeLight(int, int, bool)), this, SLOT(changeLight(int,int,bool)));
+    connect(cntrlMsgRcvThread, SIGNAL(changePositionArm(int, int)), this, SLOT(changePositionArm(int, int)));
+    connect(cntrlMsgRcvThread, SIGNAL(changeBatteryLevelRob(int)), this, SLOT(changeBatteryLevelRob(int)));
+    connect(cntrlMsgRcvThread, SIGNAL(changeSignalLevelRob(int)), this, SLOT(changeSignalLevelRob(int)));
+    connect(cntrlMsgRcvThread, SIGNAL(isConnected(int)), this, SLOT(isConnected(int)));
+    cntrlMsgRcvThread->start();
+
+    //создаем и запускаем поток на считываение и отправку состяния пульта управления
+    cntrlMsgSendThread = new ControllerMsgSendThread( ConstInfo::PORT_SEND_MSG, contrState, this);
+    connect(cntrlMsgSendThread, SIGNAL(message(QString, ConstInfo::TypeMessage)), showMessage, SLOT(addMessage(QString, ConstInfo::TypeMessage)));
+    connect(this, SIGNAL(message(QString, ConstInfo::TypeMessage)), showMessage, SLOT(addMessage(QString, ConstInfo::TypeMessage)));
+    connect(cntrlMsgSendThread, SIGNAL(doItAgain(QString)), this, SLOT(doItAgain(QString)));
+    connect(cntrlMsgSendThread, SIGNAL(errorConnection()), this, SLOT(errorConnection()));
+    connect(cntrlMsgSendThread, SIGNAL(isConnected(int)), this, SLOT(isConnected(int)));
+    cntrlMsgSendThread->start();
+
+
+    joystickInit();
+    
+    // устанавливаем по молчанию режим скорости - МЕДЛЕННО (черепаха) и
+    // режим руки - Башня-плечо-локоть
+    contrState->setArmMode(ARM_123);
+    contrState->setMoveMode(MOVE_SLOW);
+    changeLightIndicatorArm();
+    changeLightIndicatorMove();
+    modeMove = MOVE_SLOW;
+
+    // Kondrat
+    QStringList vlc_args = QStringList()
+                 //  << "--ignore-config"
+          << "--network-caching=300";
+    _instance = new VlcInstance(vlc_args, this);
+
+    //_instance = new VlcInstance(VlcCommon::args(), this);
+    _player = new VlcMediaPlayer(_instance);
+    _player->setVideoWidget(ui->widgetVideo);
+
+
+    //запуск видеопотока Kondrat
+    videoThr = new VideoThread( ConstInfo::PORT_VIDEO,this,_instance);
+    connect(videoThr, SIGNAL(errorConnection()), this, SLOT(errorConnection()));
+    connect(videoThr, SIGNAL(isConnected(int)), this, SLOT(isConnected(int)));
+    connect(videoThr, SIGNAL(videoStart( VlcMedia  *)), this, SLOT(startVideoStream( VlcMedia  *)));
+    //connect(videoThr, SIGNAL(videoStop()), this, SLOT(stopVideo()));   //11
+
+    videoThr->start();
+
+    // получение уровня заряда батареи планшета
+    battLevelThr = new TabletBatteryLevelRequest();
+    connect(battLevelThr, SIGNAL(batteryInfo(int)), this, SLOT(setBatteryLevel(int)));
+
+    battLevelThr->start();
+
+}
+
+MainWindow::~MainWindow()
+{
+    delete contrState;
+    delete robotState;
+    delete showMessage;
+
+    delete _player;
+    delete _instance;
+
+    delete ui;
+}
+
+void MainWindow::startVideoStream( VlcMedia  *_media)
+{
+     startMedia=true;
+    _player->open(_media);
+}
+
+
+void MainWindow::joystickInit()
+{
+    QStringList avaliableJoystickName = VJoystickAdapter::getAvaliableJoystickName();
+    //QString str = "avaliableJoystickName.count: " + QString::number(avaliableJoystickName.count());
+    //ui->lbTest->setText(str);
+    QTest::qWait(3000);
+    if (avaliableJoystickName.count() == 0)
+    {
+      
+      emit message(trUtf8("Джойстик не обнаружен"), ConstInfo::Info);
+      //  ui->lbTest->setText("DRGER");
+     
+    }
+    if (avaliableJoystickName.count() > 1)
+    {
+      emit message(trUtf8("Несколько джойстиков"), ConstInfo::Info);
+    }
+    if (avaliableJoystickName.count() == 1)
+    {
+        // инициализация джойстика
+        if(joystick->open(0))
+        {
+            connect(joystick, SIGNAL(sigButtonChanged(int, bool)), this, SLOT(buttonChanged(int,bool)));
+            connect(joystick, SIGNAL(sigAxisChanged(int,int)), this, SLOT(axisChanged(int,int)));
+        }
+    }
+
+}
+
+void MainWindow::buttonChanged(int id, bool state)
+{
+    if (state == false)
+    // отпускаем клавишу
+    {
+        switch (id) {
+        case ConstInfo::BUT_ARM:
+        {
+            contrState->nextArmMode();
+            changesStateButtonArm(); //kun
+           // changeLightIndicatorArm(); //kun
+            break;
+        }
+        case ConstInfo::BUT_MOVE:
+        {
+            contrState->nextMoveMode();
+            changesStateButtonMove();  //kun
+            //changeLightIndicatorMove(); //kun
+            break;
+        }
+        default:
+            break;
+        }
+    }
+}
+//kun
+void MainWindow::changesStateButtonArm()
+{
+    switch (contrState->getArmMode()) {
+    case ARM_123:
+         on_btArm123_clicked();
+         break;
+    case ARM_234:
+         on_btArm234_clicked();
+         break;
+    case ARM_456:
+         on_btArm456_clicked();
+         break;
+    default:
+        break;
+    }
+}
+void MainWindow::changesStateButtonMove()
+{
+    switch (contrState->getMoveMode()) {
+    case MOVE_STOP:
+         on_btStopMove_clicked();
+         break;
+    case MOVE_SLOW:
+        on_btSlow_clicked();
+        break;
+    case MOVE_FAST:
+       on_btFast_clicked();
+        break;
+    default:
+        break;
+    }
+}
+//  kun
+
+void MainWindow::axisChanged(int id, int state)
+{
+    //emit message("id axis = " + QString::number(id) + ", state = " + QString::number(state), ConstInfo::Info);
+    if (!isTwoJoystick){
+        if (isStop && ((id == ConstInfo::AXIS_FORWARD_BACKWARD) or (id == ConstInfo::AXIS_LEFT_RIGHT) or (id == ConstInfo::AXIS_ROTATION))) return;
+    }
+
+    switch (id) {
+    case ConstInfo::AXIS_FORWARD_BACKWARD:
+    {
+        contrState->setAxisForwardBackward(FuncUtils::JSVal2RobotVal(state, contrState->getButSpeedVal()));
+        break;
+    }
+    case ConstInfo::AXIS_LEFT_RIGHT:
+    {
+        contrState->setAxisLeftRight(FuncUtils::JSVal2RobotVal(state, contrState->getButSpeedVal()));
+        break;
+    }
+    case ConstInfo::AXIS_ROTATION:
+    {
+        contrState->setAxisRotation(FuncUtils::JSVal2RobotVal(state, contrState->getButSpeedVal()));
+        break;
+    }
+    case ConstInfo::AXIS_ARM_FORWARD_BACKWARD:
+    {
+        contrState->setAxisArmForwardBackward(FuncUtils::JSVal2RobotVal(state, ConstInfo::FAST_MODE));
+        break;
+    }
+    case ConstInfo::AXIS_ARM_LEFT_RIGHT:
+    {
+        contrState->setAxisArmLeftRight(FuncUtils::JSVal2RobotVal(state, ConstInfo::FAST_MODE));
+        break;
+    }
+    case ConstInfo::AXIS_ARM_ROTATION:
+    {
+        contrState->setAxisArmRotation(FuncUtils::JSVal2RobotVal(state, ConstInfo::FAST_MODE));
+        break;
+    }
+    default:
+        break;
+    }
+
+    QString str;
+    str= "AXIS_FORWARD_BACKWARD: " + QString::number(contrState->getAxisForwardBackward()) +"\n"+
+         "AXIS_LEFT_RIGHT: " + QString::number(contrState->getAxisLeftRight()) +"\n"+
+         "AXIS_ROTATION: " + QString::number(contrState->getAxisRotation()) +"\n"+
+         "AXIS_ARM_FORWARD_BACKWARD: " + QString::number(contrState->getAxisArmForwardBackward()) +"\n"+
+         "AXIS_ARM_LEFT_RIGHT: " + QString::number(contrState->getAxisArmLeftRight()) +"\n"+
+         "AXIS_ARM_ROTATION: " + QString::number(contrState->getAxisArmRotation());
+
+    //ui->lbTest->setText(str);
+
+    if (cntrlMsgSendThread != NULL)
+        cntrlMsgSendThread->recalcTimePeriod();
+}
+
+void MainWindow::on_btVideo_clicked()
+{
+    if (ui->lbRecordFile->text()==" ") {
+         ui->lbRecordFile->setText(trUtf8("Запись видео ! "));
+         ui->btVideo->setText(trUtf8("ВИДЕО\nСТОП"));
+
+         m_process = new QProcess(this);
+
+         QDir dir(ConstInfo::DIR_VIDEOS);
+
+         if (!dir.exists())
+             QDir().mkdir(ConstInfo::DIR_VIDEOS);
+         QString name_file_videos=ConstInfo::DIR_VIDEOS+"/video-"+QDateTime::currentDateTime().toString("dd-MM-yy_hh-mm-ss")+".avi";
+
+
+         m_process->start("ffmpeg -i ""rtsp://"
+                          +ConstInfo::IP_ADDRESS+":"
+                           +QString::number(ConstInfo::PORT_VIDEO)+ConstInfo::PATH_VIDEO
+                           +""" -vcodec copy -acodec copy -y "+name_file_videos);
+
+    }
+    else {
+        ui->lbRecordFile->setText(" ");
+        ui->btVideo->setText(trUtf8("ВИДЕО\nЗАПИСЬ"));
+        m_process->close();
+        delete m_process;
+    }
+
+//     if (!startMedia)
+//     {
+//         QMessageBox::warning(
+//             this,
+//             "Предупреждение",
+//             "Видео еще не запущено" );
+//      }
+//    else
+//     {
+//       dgVideo *dg = new dgVideo(ui->btVideo,btNameRecord);
+//       connect(dg, SIGNAL(recordVideo()), this, SLOT(onRecordVideo()));
+//       dg->exec();
+//     }
+
+}
+
+void MainWindow::on_btAudio_clicked()
+{
+    dgAudio *dg = new dgAudio(ui->btAudio);
+    connect(dg, SIGNAL(Talk()), this, SLOT(onTalk()));
+    connect(dg, SIGNAL(Listen()), this, SLOT(onListen()));
+    dg->exec();
+}
+
+void MainWindow::on_btLight_clicked()
+{
+    DgLight *dg = new DgLight(ui->btLight, false);
+    connect(dg, SIGNAL(lightOff(bool)), this, SLOT(lightOff(bool)));
+    connect(dg, SIGNAL(setLight(int,int,bool)), this, SLOT(setLight(int,int,bool)));
+    dg->exec();
+}
+
+void MainWindow::on_btLightIR_clicked()
+{
+    DgLight *dg = new DgLight(ui->btLightIR, true);
+    connect(dg, SIGNAL(lightOff(bool)), this, SLOT(lightOff(bool)));
+    connect(dg, SIGNAL(setLight(int,int,bool)), this, SLOT(setLight(int,int,bool)));
+    dg->exec();
+}
+
+
+void MainWindow::on_btRemote_clicked()
+{
+    emit message(trUtf8("Нажата кнопка Удаленно"), ConstInfo::Warning);
+}
+
+void MainWindow::clearColorFilterArm()
+{
+    ui->btArm123->setStyleSheet(ConstInfo::NO_COLOR);
+    ui->btArm234->setStyleSheet(ConstInfo::NO_COLOR);
+    ui->btArm456->setStyleSheet(ConstInfo::NO_COLOR);
+}
+void MainWindow::clearColorFilterArmR()
+{
+
+    ui->btRArm123->setStyleSheet(ConstInfo::NO_COLOR);
+//    ui->btRArm156->setStyleSheet(ConstInfo::NO_COLOR);
+    ui->btRArm456->setStyleSheet(ConstInfo::NO_COLOR);
+
+}
+
+void MainWindow::clearColorFilterMove()
+{
+    ui->btStopMove->setStyleSheet(ConstInfo::NO_COLOR);
+    ui->btSlow->setStyleSheet(ConstInfo::NO_COLOR);
+    ui->btFast->setStyleSheet(ConstInfo::NO_COLOR);
+}
+
+void MainWindow::lightOff(bool isIRLight)
+{
+    contrState->setAllLightOff(isIRLight);
+    cntrlMsgSendThread->sendRightNow(); ;// recalcTimePeriod();
+}
+
+void MainWindow::setLight(int lightId, int lightValue,bool isIRLight)
+{
+    contrState->setLight(lightId, lightValue, isIRLight);
+    cntrlMsgSendThread->sendRightNow();
+}
+
+void MainWindow::doItAgain(QString str)
+{
+    //ui->lbTestThread->setText(str);
+}
+
+
+void MainWindow::onTalk()
+{
+    if  ( ui->label_talk->isVisible())
+      ui->label_talk->setVisible(false);
+    else
+      ui->label_talk->setVisible(true);
+
+}
+void MainWindow::onListen()
+{
+    if  ( ui->label_listen->isVisible())
+      ui->label_listen->setVisible(false);
+    else
+      ui->label_listen->setVisible(true);
+
+}
+
+void MainWindow::errorConnection(int port)
+{
+    switch (port) {
+    case ConstInfo::PORT_SEND_MSG:
+        isSendConnected = false;
+        break;
+    case ConstInfo::PORT_RECEIVE_MSG:
+        isReceiveConnected = false;
+        break;
+    case ConstInfo::PORT_VIDEO:
+        isVideoConnected = false;
+        break;
+    default:
+        break;
+    }
+    ui->label_radiomodem->setEnabled(isSendConnected && isReceiveConnected && isVideoConnected);
+}
+
+
+void MainWindow::isConnected(int port)
+{
+    switch (port) {
+    case ConstInfo::PORT_SEND_MSG:
+        isSendConnected = true;
+        break;
+    case ConstInfo::PORT_RECEIVE_MSG:
+        isReceiveConnected = true;
+        break;
+    case ConstInfo::PORT_VIDEO:
+        isVideoConnected = true;
+        break;
+    default:
+        break;
+    }
+
+    ui->label_radiomodem->setEnabled(isSendConnected && isReceiveConnected && isVideoConnected);
+}
+
+void MainWindow::on_btArm456_clicked()
+{
+    contrState->setArmMode(ARM_456);
+    changeLightIndicatorArm();
+}
+
+void MainWindow::on_btArm234_clicked()
+{
+    contrState->setArmMode(ARM_234);
+    changeLightIndicatorArm();
+}
+
+void MainWindow::on_btArm123_clicked()
+{
+    contrState->setArmMode(ARM_123);
+    changeLightIndicatorArm();
+}
+
+void MainWindow::on_btFast_clicked()
+{
+    if (isStop) {
+        on_btStopMove_clicked();
+        isTwoJoystick=false;
+        setIndicatorArm();
+    }
+    contrState->setButSpeed(ConstInfo::FAST_MODE);
+    contrState->setMoveMode(MOVE_FAST);
+    changeLightIndicatorMove();
+    modeMove = MOVE_FAST;
+}
+
+void MainWindow::on_btSlow_clicked()
+{
+    if (isStop) {
+        on_btStopMove_clicked();
+        isTwoJoystick=false;
+        setIndicatorArm();
+    }
+    contrState->setButSpeed(ConstInfo::SLOW_MODE);
+    contrState->setMoveMode(MOVE_SLOW);
+    changeLightIndicatorMove();
+    modeMove = MOVE_SLOW;
+}
+
+void MainWindow::on_btStopMove_clicked()
+{
+    isStop = !isStop;
+
+    if (isStop) {
+        // режим Стоп
+        ui->btStopMove->setText("Движение");
+        //отправить сигнал на остановку робота
+        contrState->setAxisForwardBackward((qint8) 0);
+        contrState->setAxisLeftRight((qint8) 0);
+        contrState->setAxisRotation((qint8) 0);
+        // меняем время, чтобы это быстрее дошло пользователю
+        cntrlMsgSendThread->recalcTimePeriod();
+        contrState->setMoveMode(MOVE_STOP);
+        ui->btArm->setEnabled(true);
+        onTwoJoystick();
+    }
+    else {
+        // режим Движение
+        ui->btStopMove->setText("Стоп");
+        ui->btArm->setEnabled(false);
+        isTwoJoystick=false;
+        cntrlMsgSendThread->setIsTwoJoystick(false);
+        contrState->setMoveMode(modeMove);
+        setInterfaceTwoJoystick(false);
+//        setVisibleRArmButtons(false);
+//        ui->btArm234->setVisible(true);
+    }
+    changeLightIndicatorMove();
+}
+
+void MainWindow::setIndicatorArm()
+{
+    switch (contrState->getArmMode()) {
+    case ARM_123:
+         ui->btArm123->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::WARNING_MESSAGE_COLOR));
+        if (isTwoJoystick)
+             ui->btRArm456->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::WARNING_MESSAGE_COLOR));
+        break;
+    case ARM_234:
+         ui->btArm234->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::WARNING_MESSAGE_COLOR));
+//         if (isTwoJoystick)
+//              ui->btRArm156->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::WARNING_MESSAGE_COLOR));
+        break;
+    case ARM_456:
+        ui->btArm456->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::WARNING_MESSAGE_COLOR));
+        if (isTwoJoystick)
+             ui->btRArm123->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::WARNING_MESSAGE_COLOR));
+        break;
+    default:
+        break;
+    }
+
+}
+
+void MainWindow::changeLightIndicatorArm()
+{
+    clearColorFilterArm(); //гасим кнопки руки на экране
+    clearColorFilterArmR(); //гасим кнопки руки на экране
+    setLedLigths();
+    if (contrState->getMoveMode() != MOVE_FAST) setIndicatorArm();
+}
+
+void MainWindow::changeLightIndicatorMove()
+{
+    // управление световой индикацией режимов движения
+    clearColorFilterMove();
+    setLedLigths();
+    switch (contrState->getMoveMode()) {
+    case MOVE_STOP:
+        ui->btStopMove->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::WARNING_MESSAGE_COLOR));
+        setIndicatorArm();
+        break;
+    case MOVE_SLOW:
+        ui->btSlow->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::INFO_MESSAGE_COLOR));
+        setIndicatorArm();
+        break;
+    case MOVE_FAST:
+        ui->btFast->setStyleSheet(FuncUtils::getQPushButtonColorStr(ConstInfo::ERROR_MESSAGE_COLOR));
+        clearColorFilterArm(); //гасим кнопки руки на экране
+        clearColorFilterArmR(); //гасим кнопки руки на экране
+        break;
+    default:
+        break;
+    }
+}
+
+void MainWindow::setLedLigths()
+{
+    FuncUtils::ledLightsOFF();
+    if (contrState->getMoveMode() == MOVE_FAST)
+    {
+        FuncUtils::pressKey(VK_SCROLL);
+        FuncUtils::pressKey(VK_CAPITAL);
+    }
+    else
+    {
+        if (contrState->getMoveMode() == MOVE_STOP)
+        {
+            switch (contrState->getArmMode()) {
+            case ARM_123:
+                break;
+            case ARM_234:
+                FuncUtils::pressKey(VK_NUMLOCK);
+                break;
+            case ARM_456:
+                FuncUtils::pressKey(VK_CAPITAL);
+                break;
+            default:
+                break;
+            }
+        }
+        else
+        {
+            if (contrState->getMoveMode() == MOVE_SLOW)
+            {
+                switch (contrState->getArmMode()) {
+                case ARM_123:
+                    FuncUtils::pressKey(VK_NUMLOCK);
+                    FuncUtils::pressKey(VK_CAPITAL);
+                    break;
+                case ARM_234:
+                    FuncUtils::pressKey(VK_SCROLL);
+                    break;
+                case ARM_456:
+                    FuncUtils::pressKey(VK_SCROLL);
+                    FuncUtils::pressKey(VK_NUMLOCK);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void MainWindow::on_btWindowMode_clicked()
+{
+    if (isMaximizedStayOnTop)
+    {
+        Qt::WindowFlags wf = windowFlags();
+        wf ^= Qt::WindowStaysOnTopHint;
+        wf ^= Qt::FramelessWindowHint;
+        setWindowFlags(wf);
+        ui->btConnection->setVisible(true);
+        show();
+        isMaximizedStayOnTop = false;
+    }
+    else
+    {
+        Qt::WindowFlags wf = windowFlags();
+        wf |= Qt::WindowStaysOnTopHint;
+        wf |= Qt::FramelessWindowHint;
+        setWindowFlags(wf);
+        ui->btConnection->setVisible(false);
+        showMaximized();
+        isMaximizedStayOnTop = true;
+    }
+}
+
+void MainWindow::changeLight(int idLight, int lightLevel, bool isIRLight)
+{
+// пришло сообщение от робота, меняем картинки света
+    if (!isIRLight) // обычный свет
+    {
+        switch (idLight) {
+        case ConstInfo::FRONT_LIGHT:
+            FuncUtils::setLightImage(ui->lbFront, lightLevel);
+            break;
+        case ConstInfo::REAR_LIGHT:
+            FuncUtils::setLightImage(ui->lbRear, lightLevel);
+            break;
+        case ConstInfo::ARM1_LIGHT:
+            FuncUtils::setLightImage(ui->lbArm1, lightLevel);
+            break;
+        case ConstInfo::ARM2_LIGHT:
+            FuncUtils::setLightImage(ui->lbArm2, lightLevel);
+            break;
+        case ConstInfo::ELBOW_LIGHT:
+            FuncUtils::setLightImage(ui->lbElbow, lightLevel);
+            break;
+        default:
+            break;
+        }
+    }
+    else // инфракрасный свет
+    {
+        switch (idLight) {
+        case ConstInfo::FRONT_LIGHT:
+            FuncUtils::setLightIRImage(ui->lbFrontIR, lightLevel);
+            break;
+        case ConstInfo::REAR_LIGHT:
+            FuncUtils::setLightIRImage(ui->lbRearIR, lightLevel);
+            break;
+        case ConstInfo::ARM1_LIGHT:
+            FuncUtils::setLightIRImage(ui->lbArm1IR, lightLevel);
+            break;
+        case ConstInfo::ARM2_LIGHT:
+            FuncUtils::setLightIRImage(ui->lbArm2IR, lightLevel);
+            break;
+        case ConstInfo::ELBOW_LIGHT:
+            FuncUtils::setLightIRImage(ui->lbElbowIR, lightLevel);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+void MainWindow::changeBatteryLevelRob(int batteryLevel)
+{
+// пришло сообщение от робота, меняем картинки уровня заряда батареи робота
+    ui->progressBar_rbt->setValue(batteryLevel);
+}
+
+void MainWindow::changeSignalLevelRob(int signalLevel)
+{
+// пришло сообщение от робота, меняем картинки уровня сигнала
+    switch (signalLevel) {
+    case 0:
+        ui->label_signal_level->setPixmap(QPixmap(":/Resources/signal_level_0"));
+        break;
+    case 1:
+        ui->label_signal_level->setPixmap(QPixmap(":/Resources/signal_level_1"));
+        break;
+    case 2:
+        ui->label_signal_level->setPixmap(QPixmap(":/Resources/signal_level_2"));
+        break;
+    case 3:
+        ui->label_signal_level->setPixmap(QPixmap(":/Resources/signal_level_3"));
+        break;
+    case 4:
+        ui->label_signal_level->setPixmap(QPixmap(":/Resources/signal_level_4"));
+        break;
+    case 5:
+        ui->label_signal_level->setPixmap(QPixmap(":/Resources/signal_level_5"));
+        break;
+    default:
+        ui->label_signal_level->setPixmap(QPixmap(":/Resources/signal_level_0"));
+        break;
+    }
+}
+void MainWindow::changePositionArm(int idArmJoint, int positionValue)
+{
+    switch (idArmJoint) {
+    case 0:
+         ogreView->rotateTurret(positionValue);
+        break;
+    case 1:
+         ogreView->rotateJoint1(positionValue);
+        break;
+    case 2:
+         ogreView->rotateJoint2(positionValue);
+        break;
+    case 3:
+        ogreView->rotateJoint3(positionValue);
+        break;
+    case 4:
+        ogreView->heelBody(positionValue);
+        break;
+    case 5:
+        ogreView->tangageBody(positionValue);
+        break;
+    default:
+        break;
+    }
+
+}
+
+//void MainWindow::onRecordVideo()
+//{
+//    if (ui->lbRecordFile->text()==" ")
+//       {
+//          ui->lbRecordFile->setText(trUtf8("Запись видео ! "));
+//         btNameRecord="Остановить запись";
+//
+//         QMetaObject::invokeMethod(videoThr, "recordFileVideo", Qt::QueuedConnection,//Qt::DirectConnection,
+//                                     Q_ARG(bool, true));
+//        //  videoThr->recordFileVideo(true);
+//       }
+//    else
+//       {
+
+//          ui->lbRecordFile->setText(" ");
+//          btNameRecord="Видеозапись";
+//          QMetaObject::invokeMethod(videoThr, "recordFileVideo", Qt::QueuedConnection,//Qt::DirectConnection,
+//                                     Q_ARG(bool, false));
+//         // videoThr->recordFileVideo(false);
+//       }
+//}
+
+
+void MainWindow::on_btCamera_clicked()
+{
+    dgCameraMode *dg = new dgCameraMode(contrState ,ui->btCamera);
+    connect(dg, SIGNAL(sendToRobot()), this, SLOT(sendToRobot()));
+//    connect(dg, SIGNAL(Listen()), this, SLOT(onListen()));
+    dg->exec();
+}
+
+void MainWindow::setBatteryLevel(int batteryLevel){
+    ui->progressBar_pl1->setValue(batteryLevel);
+}
+
+void MainWindow::on_btConnection_clicked()
+{
+    // установка связи
+    if (cntrlMsgRcvThread->socket->state() != QAbstractSocket::ConnectedState) {
+        cntrlMsgRcvThread->socket->connectToHost(ConstInfo::IP_ADDRESS, ConstInfo::PORT_RECEIVE_MSG);
+    }
+    if (cntrlMsgSendThread->socket->state() != QAbstractSocket::ConnectedState) {
+        cntrlMsgSendThread->socket->connectToHost(ConstInfo::IP_ADDRESS, ConstInfo::PORT_SEND_MSG);
+    }
+    if (videoThr->socket->state() != QAbstractSocket::ConnectedState) {
+        videoThr->socket->connectToHost(ConstInfo::IP_ADDRESS, ConstInfo::PORT_VIDEO);
+    }
+}
+
+void MainWindow::on_btPhoto_clicked()
+{
+    QDir dir(ConstInfo::DIR_PHOTOS);
+
+    if (!dir.exists())
+        QDir().mkdir(ConstInfo::DIR_PHOTOS);
+    QString name_file = ConstInfo::DIR_PHOTOS+"/photo-"+QDateTime::currentDateTime().toString("dd-MM-yy_hh-mm-ss")+".png";
+
+    QPixmap px = QPixmap::grabWindow(QApplication::desktop()->winId()); // получаем картинку
+    px.save(name_file); // сохраняем ее
+}
+
+void MainWindow::sendToRobot()
+{
+    cntrlMsgSendThread->sendRightNow();
+}
+
+void MainWindow::on_btArm_clicked()
+{
+    dgArm *dg = new dgArm(isTwoJoystick,ui->btArm);
+    connect(dg, SIGNAL(OneJoystick()), this, SLOT(onOneJoystick()));
+    connect(dg, SIGNAL(TwoJoystick()), this, SLOT(onTwoJoystick()));
+    dg->exec();
+
+}
+
+void MainWindow::onOneJoystick()
+{
+    isTwoJoystick=false;
+    cntrlMsgSendThread->setIsTwoJoystick(false);
+
+    contrState->setAxisForwardBackward((qint8) 0);
+    contrState->setAxisLeftRight((qint8) 0);
+    contrState->setAxisRotation((qint8) 0);
+
+    setInterfaceTwoJoystick(false);
+}
+
+void MainWindow::onTwoJoystick()
+{
+    isTwoJoystick=true;
+    cntrlMsgSendThread->setIsTwoJoystick(true);
+    setInterfaceTwoJoystick(true);
+   // contrState->setAxisLeftRight(4); // для отладки
+}
+
+void MainWindow::setVisibleRArmButtons(bool visible)
+{
+//    ui->btRArm123->setVisible(visible);
+//    ui->btRArm156->setVisible(false);
+//    ui->btRArm456->setVisible(visible);
+    ui->frRArm->setVisible(visible);
+}
+
+void MainWindow::setInterfaceTwoJoystick(bool twoJoystick)
+{
+    if (twoJoystick){
+        setIndicatorArm();
+        ui->btArm234->setVisible(false);
+        setVisibleRArmButtons(true);
+        ui->btArm123->setFixedHeight(98);
+        ui->btArm456->setFixedHeight(98);
+        ui->btArm123->move(0, 100);
+
+    }
+    else {
+        clearColorFilterArmR();
+        ui->btArm234->setVisible(true);
+        setVisibleRArmButtons(false);
+        ui->btArm123->setFixedHeight(65);
+        ui->btArm456->setFixedHeight(65);
+        ui->btArm123->move(0, 130);
+    }
+
+}
