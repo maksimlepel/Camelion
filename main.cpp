@@ -30,3 +30,4 @@ int main(int argc, char *argv[])
     return a.exec();
 }//some changes in maksimsBranch
 //second changes in maksimsBranch
+//2 branch 1com
