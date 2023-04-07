@@ -41,10 +41,15 @@ ControllerState::ControllerState()
 //    mosaicTopRightCameraNum = 2;
 //    mosaicBottomLeftCameraNum = 3;
 //    mosaicBottomRightCameraNum = 4;
+    buttonReel.clear();
 }
 
 
 // SET
+
+void ControllerState::setButtonReel(QByteArray dataFromButton){
+    buttonReel = dataFromButton;
+}
 
 void ControllerState::setButArm(short  butArm)
 {
@@ -127,6 +132,11 @@ void ControllerState::setCameraMode(CameraMode cameraMode)
 //}
 
 // GET
+
+QByteArray ControllerState::getButtonReel(){
+    return buttonReel;
+}
+
 short ControllerState::getButArmVal()
 {
     return butArmVal;
@@ -253,6 +263,9 @@ QByteArray ControllerState::getMotionPackage(bool isTwoJoystick)
 
     // принудительная команда модулю электропитания
     // ... TODO
+
+    bMotionPackage.append(buttonReel);
+
     bMotionPackage.append(ConstInfo::NO_COMAND);
     bMotionPackage.append(ConstInfo::NO_COMAND);
 

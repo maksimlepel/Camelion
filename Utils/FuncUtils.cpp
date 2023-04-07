@@ -211,4 +211,30 @@ void setLightIRImage(QLabel *lb, int lightLevel)
     }
 }
 
+qint8 convertToDecimal(QByteArray array){
+    int fromHexToDec = 0;
+    QString arr = array.toHex();
+    qint8 result = 0;
+    for(int i = 0; i < arr.size(); i++){
+        if(arr[i] == '0') fromHexToDec = 0;
+        else if(arr[i] == '1') fromHexToDec = 1;
+        else if(arr[i] == '2') fromHexToDec = 2;
+        else if(arr[i] == '3') fromHexToDec = 3;
+        else if(arr[i] == '4') fromHexToDec = 4;
+        else if(arr[i] == '5') fromHexToDec = 5;
+        else if(arr[i] == '6') fromHexToDec = 6;
+        else if(arr[i] == '7') fromHexToDec = 7;
+        else if(arr[i] == '8') fromHexToDec = 8;
+        else if(arr[i] == '9') fromHexToDec = 9;
+        else if(arr[i] == 'a') fromHexToDec = 10;
+        else if(arr[i] == 'b') fromHexToDec = 11;
+        else if(arr[i] == 'c') fromHexToDec = 12;
+        else if(arr[i] == 'd') fromHexToDec = 13;
+        else if(arr[i] == 'e') fromHexToDec = 14;
+        else if(arr[i] == 'f') fromHexToDec = 15;
+        result += fromHexToDec *pow(16, arr.size() - i - 1);
+    }
+    return result;
+}
+
 }

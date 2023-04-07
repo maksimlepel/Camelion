@@ -342,32 +342,38 @@ int ControllerMsgRcvThread::angle_three_ogr()
     return angle_three;
 }
 
-void ControllerMsgRcvThread::analyseLight(int lightLevel, int idLight, bool isIRLight)
+void ControllerMsgRcvThread::analyseLight(int lightLevel, int idLight, bool isIRLight){
+    qDebug() << "Before";
+    if (lightLevel != robotState->getLightLevel(idLight, isIRLight)) //сравниваем с тем, что хранится в RobotState
     {
-        qDebug() << "Before";
-        if (lightLevel != robotState->getLightLevel(idLight, isIRLight)) //сравниваем с тем, что хранится в RobotState
-        {
-            // отсылаем сообщение, чтобы поменять картинку
+         // отсылаем сообщение, чтобы поменять картинку
 
-            emit changeLight(idLight, lightLevel, isIRLight);
-            qDebug() << "After";
-            /*context.startActivity(FuncUtils.getLightIntent(idLight,
+         emit changeLight(idLight, lightLevel, isIRLight);
+         qDebug() << "After";
+         /*context.startActivity(FuncUtils.getLightIntent(idLight,
                                                             lightLevel,
                                                             isIRLight,
                                                             ConstInfo.LIGHT_ROB_INTENT,
                                                             context,
                                                             MainActivity.class));*/
-            robotState->setLightLevel(idLight, lightLevel, isIRLight);// устанавливаем новое значение
-        }
+         robotState->setLightLevel(idLight, lightLevel, isIRLight);// устанавливаем новое значение
     }
+}
 
-void ControllerMsgRcvThread::analyseArmJoint(int positionValue, int idArmJoint)
+void ControllerMsgRcvThread::analyseArmJoint(int positionValue, int idArmJoint){
+    if (positionValue != robotState->getPositionArm(idArmJoint)) //сравниваем с тем, что хранится в RobotState
     {
-        if (positionValue != robotState->getPositionArm(idArmJoint)) //сравниваем с тем, что хранится в RobotState
-        {
-            emit changePositionArm(idArmJoint, positionValue);
+         emit changePositionArm(idArmJoint, positionValue);
 
-            robotState->setPositionArm(idArmJoint, positionValue);// устанавливаем новое значение
-        }
+         robotState->setPositionArm(idArmJoint, positionValue);// устанавливаем новое значение
     }
+}
+
+void ControllerMsgRcvThread::analyseReelState(QByteArray data){
+    QByteArray arrayM;
+    QByteArray arrayCm;
+    arrayM.append(data[0]);
+    arrayCm.append(data[1]);
+    robotState->setLenthOfReel(arrayM, arrayCm);
+}
 

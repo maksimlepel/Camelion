@@ -37,6 +37,7 @@ private:
     int rcvByte; // количество полученных байтов
     static QByteArray qba_U_;
 
+    void analyseReelState(QByteArray data);
     void analysePackage();
     void analyseLight(int lightLevel, int idLight, bool isIRLight);
     void analyseArmJoint(int positionValue, int idArmJoint);

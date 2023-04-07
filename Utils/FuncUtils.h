@@ -35,6 +35,10 @@ namespace FuncUtils {
     void setLightImage(QLabel *lb, int lightLevel);
 
     void setLightIRImage(QLabel *lb, int lightLevel);
+
+    //Convert input array in decimal number
+    qint8 convertToDecimal(QByteArray array);
+
 }
 
 #endif // FUNCUTILS_H

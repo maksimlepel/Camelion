@@ -26,6 +26,12 @@ public:
      void setLight (int lightId, int lightValue,bool isIRLight);
      void setAllLightOff(bool isIRLight);
 
+     //Setting value for buttonReel
+     void setButtonReel(QByteArray dataFromButton);
+
+     //Getting value for buttonReel
+     QByteArray getButtonReel();
+
      short getButArmVal();
      double getButSpeedVal();
      qint8 getAxisForwardBackward();
@@ -90,6 +96,9 @@ private:
 //    int mosaicTopRightCameraNum;
 //    int mosaicBottomLeftCameraNum;
 //    int mosaicBottomRightCameraNum;
+
+    QByteArray buttonReel;
+
 
 };
 
