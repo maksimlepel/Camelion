@@ -37,7 +37,7 @@ RobotState::RobotState()
 
 
 ReelState RobotState::getReelState(){
-    return reelState;
+    return *reelState;
 }
 
 

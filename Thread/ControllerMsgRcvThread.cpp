@@ -372,8 +372,8 @@ void ControllerMsgRcvThread::analyseArmJoint(int positionValue, int idArmJoint){
 void ControllerMsgRcvThread::analyseReelState(QByteArray data){
     QByteArray arrayM;
     QByteArray arrayCm;
-    array1.append(data[0]);
-    array2.append(data[1]);
+    arrayM.append(data[0]);
+    arrayCm.append(data[1]);
     robotState->setLenthOfReel(arrayM, arrayCm);
 }
 

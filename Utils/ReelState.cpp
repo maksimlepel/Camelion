@@ -14,9 +14,9 @@ void ReelState::setLengthCm(qint8 lengthCm){
 }
 
 qint8 ReelState::getLengthM(){
-    return lengthM;
+    return m_lengthM;
 }
 
 qint8 ReelState::getLengthCm(){
-    return lengthCm;
+    return m_lengthCm;
 }
