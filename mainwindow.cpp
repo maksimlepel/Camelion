@@ -487,7 +487,7 @@ MainWindow::MainWindow(int argc, char **argv, QWidget *parent) :
         //serialPort->open(QSerialPort::OpenModeFlag::ReadOnly);
 
         //connect(serialPort, static_cast<void (QSerialPort::*) (QSerialPort::SerialPortError)> (&QSerialPort::error), this, & MainWindow::reconnect_port);
-       // connect(serialPort,&QSerialPort::readyRead,this,&MainWindow::onReadyRead);
+       //connect(serialPort,&QSerialPort::readyRead,this,&MainWindow::onReadyRead);
         //connect(serialPort, SIGNAL(error(QSerialPort::SerialPortError)), this, SLOT(errorSerial(QSerialPort::SerialPortError)));
         //connect(serialPort,&QSerialPort::error,this, SLOT(reconnect_port()));
 

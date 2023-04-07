@@ -1,5 +1,6 @@
 #include "RobotState.h"
 #include "Utils/ConstInfo.h"
+#include "FuncUtils.h"
 
 RobotState::RobotState()
 {
@@ -28,7 +29,17 @@ RobotState::RobotState()
     positionArmMap[ConstInfo::ARM345]=0;
     positionArmMap[ConstInfo::TANGAGE]=0;
     positionArmMap[ConstInfo::HEEL]=0;
+
+    reelState = new ReelState();
 }
+
+
+
+
+ReelState RobotState::getReelState(){
+    return reelState;
+}
+
 
 int RobotState::getLightLevel(int idLight, bool isIRLight)
 {
@@ -57,6 +68,12 @@ int RobotState::getBatteryLevel()
 int RobotState::getSignalLevel()
 {
     return signalLevel;
+}
+
+
+void RobotState::setLenthOfReel(QByteArray arrayM, QByteArray arrayCm){
+    reelState->setLengthM(FuncUtils::convertToDecimal(arrayM));
+    reelState->setLengthM(FuncUtils::convertToDecimal(arrayCm));
 }
 
 void RobotState::setLightLevel(int idLight, int lightLevel, bool isIRLight)
