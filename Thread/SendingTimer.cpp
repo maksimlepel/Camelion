@@ -14,7 +14,7 @@ SendingTimer::SendingTimer(QObject* parent)
     this->setParent(parent);
     timer = new QTimer(this);
     connect(timer, SIGNAL(timeout()), this, SLOT(sending()));
-    timer->setInterval(ConstInfo::TIME_PERIOD_DEFAULT);
+    timer->setInterval(ConstInfo::TIME_PERIOD);
 }
 
 SendingTimer::~SendingTimer()
