@@ -469,7 +469,7 @@ MainWindow::MainWindow(int argc, char **argv, QWidget *parent) :
 
 
 
-        this->serialPort = new QSerialPort(this);
+       /* this->serialPort = new QSerialPort(this);
         serialPort->setPortName("COM6");
         serialPort->open(QSerialPort::OpenModeFlag::ReadWrite);
         serialPort->setBaudRate(QSerialPort::Baud9600);
@@ -482,7 +482,7 @@ MainWindow::MainWindow(int argc, char **argv, QWidget *parent) :
 
         connect(m_pTcpSocket, SIGNAL(readyRead()), this, SLOT(slotReadyRead()));
        connect(serialPort, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
-        connect(this, SIGNAL(send(QByteArray)), this, SLOT(sendData(QByteArray)));
+        connect(this, SIGNAL(send(QByteArray)), this, SLOT(sendData(QByteArray)));*/
 
         //serialPort->open(QSerialPort::OpenModeFlag::ReadOnly);
 

@@ -1,4 +1,5 @@
 #include "ButtonReelSerialPort.h"
+#include <QDebug>
 
 ButtonReelSerialPort::ButtonReelSerialPort()
 {

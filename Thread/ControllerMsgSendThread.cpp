@@ -29,10 +29,10 @@ ControllerMsgSendThread::ControllerMsgSendThread(int numPort, RobotState *robotS
     timePeriod = ConstInfo::TIME_PERIOD_DEFAULT;
 
     sengingTimer = new SendingTimer(this);
-    buttonReelSerialPort = new ButtonReelSerialPort();
+
     connect(this, SIGNAL(changeSendingInteval(int)), sengingTimer, SLOT(changeSendingInteval(int)));
    // connect(sengingTimer, SIGNAL(doIt(QString)), this, SLOT(doIt(QString)));
-    connect(sengingTimer, SIGNAL(doIt(QString)), this, SLOT(doIt(QString)));
+//    connect(sengingTimer, SIGNAL(doIt(QString)), this, SLOT(doIt(QString)));
 
 
     connect(this, SIGNAL(errorConnection(int)), sengingTimer, SLOT(stop()));
@@ -53,13 +53,14 @@ ControllerMsgSendThread::~ControllerMsgSendThread()
 
 void ControllerMsgSendThread::mainFunction()
 {
+     buttonReelSerialPort = new ButtonReelSerialPort();
     connect(socket, SIGNAL(readyRead()), this, SLOT(processRead()));
     connect(buttonReelSerialPort, SIGNAL(sendButtonReel(QByteArray)), this, SLOT(sendDataToButtonReel(QByteArray)));
 //    timePeriod = ConstInfo::TIME_PERIOD_DEFAULT;
 
 //    sengingTimer = new SendingTimer(this);
 //    connect(this, SIGNAL(changeSendingInteval(int)), sengingTimer, SLOT(changeSendingInteval(int)));
-//    connect(sengingTimer, SIGNAL(doIt(QString)), this, SLOT(doIt(QString)));
+    connect(sengingTimer, SIGNAL(doIt(QString)), this, SLOT(doIt(QString)));
 //    sengingTimer->moveToThread(this);
 //    createSocket();
 
@@ -112,7 +113,7 @@ void ControllerMsgSendThread::sendInfo()
         // ошибка отправки
         emit message(trUtf8("Ошибка отправки пакета движения"), ConstInfo::Error);
     }
-
+  qDebug() << "BLOCK : " << block.toHex();
     block.clear();
     if (isTwoJoystick){
         block = controllerState->getMotionPackageArm2();
@@ -122,7 +123,7 @@ void ControllerMsgSendThread::sendInfo()
     }
     rez = 0;
     rez = socket->write(block);
-    qDebug() << "BLOCK : " << block.toHex();
+
     //qDebug() << "inPkg : " << block;
     if (rez == -1)
     {
@@ -209,9 +210,9 @@ void ControllerMsgSendThread::recalcTimePeriod()
 
 void ControllerMsgSendThread::doIt(QString str)
 {
-   /* sendInfo();
-    emit doItAgain(str); */// сигнал - только для отладки - показать на интерфейсе, как идет отправка пакетов,
-                         // потом убрать
+    sendInfo();
+    emit doItAgain(str); /**/// сигнал - только для отладки - показать на интерфейсе, как идет отправка пакетов,
+                         // потом убрать*/
 }
 
 void ControllerMsgSendThread::sendRightNow()
