@@ -8,6 +8,7 @@
 #include "Utils/ControllerState.h"
 #include "Thread/SendingTimer.h"
 #include "Utils/RobotState.h"
+#include "SerialPort/ButtonReelSerialPort.h"
 /*
    Класс-поток, постоянно считывающий команды (состояние джойстика и что было нажато) с управляющего модуля, и передающий их роботу
  */
@@ -44,6 +45,8 @@ private:
 
     RobotState *robotState;
 
+    ButtonReelSerialPort* buttonReelSerialPort;
+
     ControllerState *controllerState;
     QTimer *timer;
 
@@ -66,6 +69,9 @@ public  slots:
     void setIsTwoJoystick(bool isTwoJoystick);
     void processRead();
     void analyseArmJoint(int positionValue, int idArmJoint);
+
+    //send data from buttonReel serialport to buttonReel
+    void sendDataToButtonReel(QByteArray data);
 
 signals:
     void changeSendingInteval(int interval);

@@ -264,6 +264,7 @@ QByteArray ControllerState::getMotionPackage(bool isTwoJoystick)
     // принудительная команда модулю электропитания
     // ... TODO
 
+    //append data of button reel
     bMotionPackage.append(buttonReel);
 
     bMotionPackage.append(ConstInfo::NO_COMAND);

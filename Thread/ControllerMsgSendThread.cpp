@@ -29,6 +29,7 @@ ControllerMsgSendThread::ControllerMsgSendThread(int numPort, RobotState *robotS
     timePeriod = ConstInfo::TIME_PERIOD_DEFAULT;
 
     sengingTimer = new SendingTimer(this);
+    buttonReelSerialPort = new ButtonReelSerialPort();
     connect(this, SIGNAL(changeSendingInteval(int)), sengingTimer, SLOT(changeSendingInteval(int)));
    // connect(sengingTimer, SIGNAL(doIt(QString)), this, SLOT(doIt(QString)));
     connect(sengingTimer, SIGNAL(doIt(QString)), this, SLOT(doIt(QString)));
@@ -36,6 +37,9 @@ ControllerMsgSendThread::ControllerMsgSendThread(int numPort, RobotState *robotS
 
     connect(this, SIGNAL(errorConnection(int)), sengingTimer, SLOT(stop()));
     connect(this, SIGNAL(isConnected(int)), sengingTimer, SLOT(start()));
+
+    //connect serialport send SIGNAL to SLOT
+
 
     sengingTimer->moveToThread(this);
 
@@ -50,6 +54,7 @@ ControllerMsgSendThread::~ControllerMsgSendThread()
 void ControllerMsgSendThread::mainFunction()
 {
     connect(socket, SIGNAL(readyRead()), this, SLOT(processRead()));
+    connect(buttonReelSerialPort, SIGNAL(sendButtonReel(QByteArray)), this, SLOT(sendDataToButtonReel(QByteArray)));
 //    timePeriod = ConstInfo::TIME_PERIOD_DEFAULT;
 
 //    sengingTimer = new SendingTimer(this);
@@ -165,6 +170,9 @@ void ControllerMsgSendThread::sendInfo()
 
 }
 
+void ControllerMsgSendThread::sendDataToButtonReel(QByteArray data){
+    controllerState->setButtonReel(data);
+}
 
 void ControllerMsgSendThread::recalcTimePeriod()
 {
