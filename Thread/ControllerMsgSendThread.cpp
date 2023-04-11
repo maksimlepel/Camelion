@@ -230,9 +230,10 @@ void ControllerMsgSendThread::processRead()
 {
     inPkg.fill(0);
     //char * data;
-    rcvByte = socket->read(inPkg.data(), 34/*socket->bytesAvailable()*/);
-    //inPkg = socket->readAll();
-
+//    rcvByte = socket->read(inPkg.data(), 34/*socket->bytesAvailable()*/);
+    inPkg = socket->readAll();
+ qDebug()<<"InPkg from ControllerMsgSendThread"<<inPkg.toHex();
+// qDebug()<<"rcvByte ControllerMsgSendThread"<<rcvByte;
     if (inPkg.length()/*rcvByte*/ > 40)
     {
         analysePackage();
@@ -251,6 +252,15 @@ void ControllerMsgSendThread::analysePackage()
     switch (inPkg[6]){
         case ConstInfo::PKG_TYPE_MOBILE_PLATFORM: // ПЛАТФОРМА
         {
+
+        QByteArray sm;
+        sm.resize(1);
+        sm.append(inPkg[34]);
+        QByteArray m;
+        m.resize(1);
+        m.append(inPkg[33]);
+        robotState->setLenthOfReel(m,sm);
+
             int varValue;
             QByteArray bbb;
             emit changeFlippers(2);
