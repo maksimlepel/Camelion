@@ -49,6 +49,7 @@ void ControllerMsgRcvThread::processRead()
     inPkg.fill(0);
     //char * data;
     rcvByte = socket->read(inPkg.data(), 28/*socket->bytesAvailable()*/);
+    qDebug()<<"InPkg"<<inPkg;
     if (rcvByte > 40)
     {
         analysePackage();
