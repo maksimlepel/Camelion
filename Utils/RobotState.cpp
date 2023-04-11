@@ -73,7 +73,7 @@ int RobotState::getSignalLevel()
 
 void RobotState::setLenthOfReel(QByteArray arrayM, QByteArray arrayCm){
     reelState->setLengthM(FuncUtils::convertToDecimal(arrayM));
-    reelState->setLengthM(FuncUtils::convertToDecimal(arrayCm));
+    reelState->setLengthCm(FuncUtils::convertToDecimal(arrayCm));
 }
 
 void RobotState::setLightLevel(int idLight, int lightLevel, bool isIRLight)

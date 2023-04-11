@@ -55,7 +55,7 @@ namespace ConstInfo {
     const QString  NAME_BUT_STOP="Стоп";
 
 
-    const QString IP_ADDRESS = "169.254.181.248";
+    const QString IP_ADDRESS = /*"10.42.01"*/"169.254.181.248";
    // const QString IP_ADDRESS = "10.7.7.124";
     const QString PATH_VIDEO="/teststream";
     const QString PATH_VIDEO2="/temp";
