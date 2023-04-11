@@ -265,7 +265,7 @@ QByteArray ControllerState::getMotionPackage(bool isTwoJoystick)
     // ... TODO
 
     //append data of button reel
-    bMotionPackage.append(buttonReel);
+    buttonReel[0]==1 ? bMotionPackage.append(char(1)):bMotionPackage.append(char(0));
 
     bMotionPackage.append(ConstInfo::NO_COMAND);
     bMotionPackage.append(ConstInfo::NO_COMAND);
