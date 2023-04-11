@@ -77,6 +77,9 @@ signals:
     void changeSendingInteval(int interval);
     void doItAgain(QString str);
 
+    //signal for change label_8 when data of reelState is changing
+    void show();
+
     void changeLight(int idLight, int lightLevel, bool isIRLight);
     void changePositionArm(int idArmJoint, int positionValue);
     void changeBatteryLevelRob(int batteryLevel);

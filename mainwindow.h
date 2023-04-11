@@ -54,7 +54,6 @@ public:
 
      QTcpSocket* m_pTcpSocket;
 
-     int convertToDecimal(QByteArray array);
      static int i_U_rob;
      ShowMessage *showMessage2;
      QByteArray prevData;
@@ -69,8 +68,6 @@ public slots:
 private slots:
 
 
-    void sendData(QByteArray data);
-    void onReadyRead();
 
     void reconnect();
     //void reconnect_port();
@@ -84,6 +81,11 @@ private slots:
     //virtual void slotNewConnection();
     //void slotReadClient();
 
+
+    //slot for change label_8 when data of reelState is changing
+    void showLabel();
+
+    void onReadyRead();
     void slotReadyRead();
     void slotError(QAbstractSocket::SocketError);
     void slotSendToServer();
@@ -186,7 +188,7 @@ private:
     QTimer* sendTimer;
     QByteArray receiveDataBuffer;
     QByteArray speed(QByteArray qba_XY);
-    void lvlAKB_2(QByteArray qbaU);;
+    void lvlAKB_2(QByteArray qbaU);
     void lvlAKB(QByteArray qbaU);
     static QByteArray qbaForMrk;
     static QByteArray qba_From_Mrk;
