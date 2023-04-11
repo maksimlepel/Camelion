@@ -357,6 +357,7 @@ MainWindow::MainWindow(int argc, char **argv, QWidget *parent) :
     connect(cntrlMsgSendThread, SIGNAL(changePositionArm(int, int)), this, SLOT(changePositionArm(int, int)));
     connect(cntrlMsgSendThread, SIGNAL(changeBatteryLevelRob(int)), this, SLOT(changeBatteryLevelRob(int)));
     connect(cntrlMsgSendThread, SIGNAL(changeSignalLevelRob(int)), this, SLOT(changeSignalLevelRob(int)));
+    connect(cntrlMsgSendThread, SIGNAL(show()), this, SLOT(showLabel()));
 
     //cntrlMsgSendThread->setParent(this);
     cntrlMsgSendThread->start();
@@ -469,20 +470,11 @@ MainWindow::MainWindow(int argc, char **argv, QWidget *parent) :
 
 
 
-       /* this->serialPort = new QSerialPort(this);
-        serialPort->setPortName("COM6");
-        serialPort->open(QSerialPort::OpenModeFlag::ReadWrite);
-        serialPort->setBaudRate(QSerialPort::Baud9600);
-        serialPort->setParity(QSerialPort::Parity::NoParity);
-        serialPort->setDataBits(QSerialPort::DataBits::Data8);
-        serialPort->setStopBits(QSerialPort::StopBits::OneStop);
+//        m_pTcpSocket = new QTcpSocket(this);
+//        m_pTcpSocket->connectToHost("169.254.8.145", 5210);
 
-        m_pTcpSocket = new QTcpSocket(this);
-        m_pTcpSocket->connectToHost("169.254.8.145", 5210);
-
-        connect(m_pTcpSocket, SIGNAL(readyRead()), this, SLOT(slotReadyRead()));
-       connect(serialPort, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
-        connect(this, SIGNAL(send(QByteArray)), this, SLOT(sendData(QByteArray)));*/
+//        connect(m_pTcpSocket, SIGNAL(readyRead()), this, SLOT(slotReadyRead()));
+//       connect(serialPort, SIGNAL(readyRead()), this, SLOT(onReadyRead()));
 
         //serialPort->open(QSerialPort::OpenModeFlag::ReadOnly);
 
@@ -813,20 +805,6 @@ void MainWindow::slotReadyRead()
 
     QDataStream in(m_pTcpSocket);
     in.setVersion(QDataStream::Qt_5_6); */
-
-
-        QByteArray Data = m_pTcpSocket->readAll();
-        qDebug() << "Data from PM:" << Data.toHex();
-        QByteArray array1;
-        QByteArray array2;
-        array1.append(Data[0]);
-        array2.append(Data[1]);
-        int meter = convertToDecimal(array1);
-        int centimeters = convertToDecimal(array2);
-
-        if(meter < 1) ui->label_8->setStyleSheet("QLabel {background-color:red; color:black}");
-        else ui->label_8->setStyleSheet("QLabel{color:black}");
-        ui->label_8->setText("В катушке осталось: \n" + QString::number(meter) + " м " + QString::number(centimeters) + " см.");
 //        showMessage2->addMessage("В катушке осталось: " + QString::number(meter) + " м " + QString::number(centimeters) + " см.", ConstInfo::TypeMessage::Info);
 
 //        QString str = (QString) Data;
@@ -875,33 +853,7 @@ void MainWindow::slotReadyRead()
     }*/
 }
 
-int MainWindow::convertToDecimal(QByteArray array){
-    int fromHexToDec = 0;
-    QString arr = array.toHex();
-    int result = 0;
-    qDebug() << "String number: " << arr;
-    for(int i = 0; i < arr.size(); i++){
-        if(arr[i] == '0') fromHexToDec = 0;
-        else if(arr[i] == '1') fromHexToDec = 1;
-        else if(arr[i] == '2') fromHexToDec = 2;
-        else if(arr[i] == '3') fromHexToDec = 3;
-        else if(arr[i] == '4') fromHexToDec = 4;
-        else if(arr[i] == '5') fromHexToDec = 5;
-        else if(arr[i] == '6') fromHexToDec = 6;
-        else if(arr[i] == '7') fromHexToDec = 7;
-        else if(arr[i] == '8') fromHexToDec = 8;
-        else if(arr[i] == '9') fromHexToDec = 9;
-        else if(arr[i] == 'a') fromHexToDec = 10;
-        else if(arr[i] == 'b') fromHexToDec = 11;
-        else if(arr[i] == 'c') fromHexToDec = 12;
-        else if(arr[i] == 'd') fromHexToDec = 13;
-        else if(arr[i] == 'e') fromHexToDec = 14;
-        else if(arr[i] == 'f') fromHexToDec = 15;
-        result += fromHexToDec *pow(16, arr.size() - i - 1);
-    }
-    qDebug() << "Decimal: " << result;
-    return result;
-}
+
 int MainWindow::fromHexToDecimal(QByteArray arrayForU2){
     int fromHexToDec = 0;
     int result = 0;
@@ -2143,12 +2095,6 @@ void MainWindow::errorConnection(int port)
     serialPort->open(QIODevice::ReadWrite);*/
 }
 
-void MainWindow::sendData(QByteArray data){
-
-    int number =   m_pTcpSocket->write(data);
-    qDebug() << "Number " << QString::number(number);
-
-}
 
 
 void MainWindow::isConnected(int port)
@@ -2673,6 +2619,15 @@ void MainWindow::on_btWindowMode_clicked()
     pingmodel->finished();
     //delete m_process;
     close();
+}
+
+void MainWindow::showLabel(){
+    int m = robotState->getReelState().getLengthM();
+    int cm = robotState->getReelState().getLengthCm();
+    if(m < 1) ui->label_8->setStyleSheet("QLabel {background-color:red; color:black}");
+    else ui->label_8->setStyleSheet("QLabel{color:black}");
+    ui->label_8->setText("В катушке осталось: \n" + QString::number(m) + " м " + QString::number(cm) + " см.");
+
 }
 
 void MainWindow::changeLight(int idLight, int lightLevel, bool isIRLight)

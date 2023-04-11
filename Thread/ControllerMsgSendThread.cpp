@@ -438,6 +438,7 @@ void ControllerMsgSendThread::analysePackage()
             //varValue = FuncUtils::byteArrayToShort(bbb);
            // varValue = 2 * bbb.toInt();
           //  emit changeFlippers(varValue);
+            emit show();
             break;
         }
     case ConstInfo::PKG_TYPE_MANIPULATOR: // МАНИПУЛЯТОР
