@@ -156,11 +156,6 @@ private slots:
     void dgSecondVideoDelete();
     void receiveMedia2(VlcMedia  * vlcMedia);
 
-    void on_pushButton_clicked();
-
-
-    void on_pushButton_3_clicked();
-
 private:
     Ui::MainWindow *ui;
 
