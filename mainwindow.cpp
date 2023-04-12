@@ -3068,36 +3068,3 @@ bool MainWindow::close_port(){
     }
 }*/
 
-void MainWindow::on_pushButton_clicked()
-{
-    QByteArray data;
-    data.clear();
-    data.append(0x01);
-    data.append(0x01);
-    data.append(0x01);
-    data.append(0x01);
-    data.append(0x01);
-    data.append(0x01);
-    data.append(0x01);
-    data.append(0x01);
-    emit send(data);
-
-}
-
-
-
-void MainWindow::on_pushButton_3_clicked()
-{
-    QByteArray data;
-    int a = 0;
-    data.clear();
-    data.append(a);
-    data.append(a);
-    data.append(a);
-    data.append(a);
-    data.append(a);
-    data.append(a);
-    data.append(a);
-    data.append(a);
-    emit send(data);
-}
